@@ -215,67 +215,181 @@ function TripsTab({ solution, data }: { solution: Solution; data: InputData }) {
   return (
     <div className="p-6">
       <h2 className="text-lg font-bold mb-4">Рейсы бензовозов ({solution.Trips.length})</h2>
+      
+      {/* Сводная таблица */}
+      <div className="mb-6 bg-gray-900/50 rounded-lg p-4 border border-gray-600">
+        <h3 className="text-sm font-bold mb-3 text-gray-300">📊 Сводка по рейсам</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-600">
+                <th className="p-2 text-left text-gray-400">Бензовоз</th>
+                <th className="p-2 text-center text-gray-400">Скорость</th>
+                <th className="p-2 text-center text-gray-400">Секций</th>
+                <th className="p-2 text-center text-gray-400">Станций</th>
+                <th className="p-2 text-center text-gray-400">Общий объём</th>
+                <th className="p-2 text-center text-gray-400">Пробег</th>
+                <th className="p-2 text-center text-gray-400">Время</th>
+              </tr>
+            </thead>
+            <tbody>
+              {solution.Trips.map(trip => {
+                const tanker = data.Tankers.find(t => t.Id === trip.TankerId)!;
+                const totalVolume = trip.Assignments.reduce((sum, a) => sum + a.Volume, 0);
+                const uniqueStations = new Set(trip.Assignments.map(a => a.StationIndex)).size;
+                return (
+                  <tr key={trip.TankerId} className="border-b border-gray-700 hover:bg-gray-800/50">
+                    <td className="p-2 font-medium">№{trip.TankerId}</td>
+                    <td className="p-2 text-center text-gray-300">{tanker.Speed} км/ч</td>
+                    <td className="p-2 text-center text-gray-300">{tanker.Compartments.length}</td>
+                    <td className="p-2 text-center text-gray-300">{uniqueStations}</td>
+                    <td className="p-2 text-center text-blue-300">{(totalVolume / 1000).toFixed(1)} т</td>
+                    <td className="p-2 text-center text-green-300">{trip.TotalDistance} км</td>
+                    <td className="p-2 text-center text-yellow-300">{trip.TotalTime} ч</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-gray-500 font-bold">
+                <td className="p-2">ИТОГО</td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2"></td>
+                <td className="p-2 text-center text-blue-400">
+                  {(solution.Trips.reduce((sum, t) => sum + t.Assignments.reduce((s, a) => s + a.Volume, 0), 0) / 1000).toFixed(1)} т
+                </td>
+                <td className="p-2 text-center text-green-400">{solution.TotalDistance} км</td>
+                <td className="p-2 text-center text-yellow-400">{solution.TotalTime} ч</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Детальная информация по каждому рейсу */}
       <div className="space-y-4">
         {solution.Trips.map(trip => {
           const tanker = data.Tankers.find(t => t.Id === trip.TankerId)!;
+          const totalVolume = trip.Assignments.reduce((sum, a) => sum + a.Volume, 0);
+          const totalCapacity = tanker.Compartments.reduce((sum, c) => sum + c.Capacity, 0);
+          const utilizationPct = ((totalVolume / totalCapacity) * 100).toFixed(1);
+          
           return (
-            <div key={trip.TankerId} className="bg-gray-900/50 rounded-lg p-4 border border-gray-600">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🚛</span>
-                  <div>
-                    <span className="font-bold text-lg">Бензовоз №{trip.TankerId}</span>
-                    <span className="text-gray-400 ml-2 text-sm">({tanker.Speed} км/ч, {tanker.Compartments.length} секц.)</span>
+            <div key={trip.TankerId} className="bg-gray-900/50 rounded-lg border border-gray-600 overflow-hidden">
+              {/* Заголовок рейса */}
+              <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 p-4 border-b border-gray-600">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">🚛</span>
+                    </div>
+                    <div>
+                      <div className="font-bold text-xl">Бензовоз №{trip.TankerId}</div>
+                      <div className="text-sm text-gray-400">
+                        {tanker.Speed} км/ч • {tanker.Compartments.length} секц. • {(totalCapacity / 1000).toFixed(0)} т общая ёмкость
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-400">{trip.TotalDistance} <span className="text-sm">км</span></div>
+                    <div className="text-sm text-gray-400">{trip.TotalTime} ч</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-blue-400 font-bold">{trip.TotalDistance} км</div>
-                  <div className="text-gray-400 text-sm">{trip.TotalTime} ч</div>
-                </div>
-              </div>
-              
-              <div className="mb-3">
-                <span className="text-xs text-gray-500 uppercase tracking-wide">Маршрут:</span>
-                <div className="flex items-center gap-1 mt-1 flex-wrap">
-                  {trip.Route.map((node, i) => (
-                    <span key={i} className="flex items-center gap-1">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        node === 0 ? 'bg-orange-600/30 text-orange-300' : 'bg-blue-600/30 text-blue-300'
-                      }`}>
-                        {node === 0 ? '🏭 База' : `Ст. ${node}`}
-                      </span>
-                      {i < trip.Route.length - 1 && <span className="text-gray-500">→</span>}
-                    </span>
-                  ))}
+
+                {/* Статистика загрузки */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-gray-800/50 rounded p-2">
+                    <div className="text-xs text-gray-400 mb-1">Загружено</div>
+                    <div className="text-lg font-bold text-green-400">{(totalVolume / 1000).toFixed(1)} т</div>
+                  </div>
+                  <div className="bg-gray-800/50 rounded p-2">
+                    <div className="text-xs text-gray-400 mb-1">Использование</div>
+                    <div className="text-lg font-bold text-yellow-400">{utilizationPct}%</div>
+                  </div>
+                  <div className="bg-gray-800/50 rounded p-2">
+                    <div className="text-xs text-gray-400 mb-1">Станций обслужено</div>
+                    <div className="text-lg font-bold text-purple-400">{new Set(trip.Assignments.map(a => a.StationIndex)).size}</div>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {trip.Assignments.map((a, idx) => {
-                  const capacity = tanker.Compartments[a.CompartmentIndex].Capacity;
-                  const fillPct = ((a.Volume / capacity) * 100).toFixed(1);
-                  return (
-                    <div key={idx} className="bg-gray-800 rounded p-2 text-sm">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium">
-                          Секция {a.CompartmentIndex + 1} ({capacity} л)
+              {/* Маршрут с расстояниями */}
+              <div className="p-4 border-b border-gray-700">
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">📍 Маршрут с расстояниями:</div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {trip.Route.map((node, i) => {
+                    const prevNode = i > 0 ? trip.Route[i - 1] : null;
+                    const distance = prevNode !== null ? data.DistanceMatrix[prevNode][node] : 0;
+                    return (
+                      <span key={i} className="flex items-center gap-2">
+                        <span className={`px-3 py-1.5 rounded text-sm font-medium ${
+                          node === 0 ? 'bg-orange-600/30 text-orange-300 border border-orange-500/30' : 'bg-blue-600/30 text-blue-300 border border-blue-500/30'
+                        }`}>
+                          {node === 0 ? '🏭 База' : `Ст. ${node}`}
                         </span>
-                        <span className={`px-2 py-0.5 rounded text-xs ${getFuelColor(a.FuelType)}`}>
-                          {a.FuelType}
-                        </span>
+                        {i < trip.Route.length - 1 && (
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            → <span className="text-green-400">{distance} км</span> →
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Детальная загрузка секций */}
+              <div className="p-4">
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">📦 Детальная загрузка секций:</div>
+                <div className="space-y-3">
+                  {trip.Assignments.map((a, idx) => {
+                    const capacity = tanker.Compartments[a.CompartmentIndex].Capacity;
+                    const fillPct = ((a.Volume / capacity) * 100).toFixed(1);
+                    const freeSpace = capacity - a.Volume;
+                    return (
+                      <div key={idx} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-gray-600 to-gray-700 rounded flex items-center justify-center text-sm font-bold">
+                              {a.CompartmentIndex + 1}
+                            </div>
+                            <div>
+                              <div className="font-medium text-sm">Секция {a.CompartmentIndex + 1}</div>
+                              <div className="text-xs text-gray-400">Ёмкость: {capacity.toLocaleString()} л</div>
+                            </div>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getFuelColor(a.FuelType)}`}>
+                            {a.FuelType}
+                          </span>
+                        </div>
+
+                        <div className="ml-10 space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-300">→ Станция {a.StationIndex + 1}</span>
+                            <span className="font-bold text-blue-400">{a.Volume.toLocaleString()} л</span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <span>Заполнение: <span className="text-green-400 font-medium">{fillPct}%</span></span>
+                            <span>•</span>
+                            <span>Свободно: <span className="text-yellow-400">{freeSpace.toLocaleString()} л</span></span>
+                          </div>
+
+                          <div className="relative h-3 bg-gray-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-blue-500 via-green-500 to-emerald-500 rounded-full transition-all"
+                              style={{ width: `${fillPct}%` }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow">
+                              {fillPct}%
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-gray-400 mt-1">
-                        → Станция {a.StationIndex + 1}: {a.Volume.toLocaleString()} л ({fillPct}%)
-                      </div>
-                      <div className="mt-1 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
-                          style={{ width: `${fillPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           );
