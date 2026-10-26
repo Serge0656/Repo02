@@ -70,20 +70,13 @@ function solveWithBalancedGreedy(data: InputData): Solution {
     }
   }
 
-  const fuelTotals: Record<string, number> = {};
+  // Создаём все задачи доставки
+  const allTasks: DeliveryTask[] = [];
   for (const ft of FuelTypes) {
-    fuelTotals[ft] = StationDemand[ft].reduce((s: number, v: number) => s + v, 0);
-  }
-
-  const sortedFuels = [...FuelTypes].sort((a, b) => fuelTotals[a] - fuelTotals[b]);
-  const assignments: SlotAssignment[] = [];
-
-  for (const ft of sortedFuels) {
-    const tasks: DeliveryTask[] = [];
     const demands = StationDemand[ft];
     for (let s = 0; s < numStations; s++) {
       if (demands[s] > 0) {
-        tasks.push({
+        allTasks.push({
           fuelType: ft,
           stationIndex: s,
           volumeNeeded: demands[s],
@@ -91,54 +84,73 @@ function solveWithBalancedGreedy(data: InputData): Solution {
         });
       }
     }
+  }
 
-    tasks.sort((a, b) => b.volumeNeeded - a.volumeNeeded);
+  // Стратегия "Most Constrained First":
+  // Считаем для каждой задачи количество подходящих секций
+  // Задачи с меньшим количеством вариантов обрабатываем первыми
+  const taskFlexibility = allTasks.map(task => {
+    let flexibleSlots = 0;
+    for (const slot of slots) {
+      const minFill = slot.capacity * 0.8;
+      // Секция подходит если: задача >= 80% секции ИЛИ секция <= задача
+      if (task.volumeNeeded >= minFill || slot.capacity <= task.volumeNeeded) {
+        flexibleSlots++;
+      }
+    }
+    return { task, flexibility: flexibleSlots };
+  });
 
-    for (const task of tasks) {
-      while (task.volumeRemaining > 0) {
-        let bestSlot: Slot | null = null;
-        let bestScore = Infinity;
-        let bestVolume = 0;
+  // Сортируем: наименее гибкие задачи первыми
+  taskFlexibility.sort((a, b) => a.flexibility - b.flexibility);
 
-        for (const slot of slots) {
-          if (slot.assigned) continue;
+  const assignments: SlotAssignment[] = [];
 
-          const minFill = slot.capacity * 0.8;
-          let volumeToLoad: number;
+  // Обрабатываем задачи в порядке гибкости
+  for (const { task } of taskFlexibility) {
+    while (task.volumeRemaining > 0) {
+      let bestSlot: Slot | null = null;
+      let bestScore = Infinity;
+      let bestVolume = 0;
 
-          if (task.volumeRemaining >= slot.capacity) {
-            volumeToLoad = slot.capacity;
-          } else if (task.volumeRemaining >= minFill) {
-            volumeToLoad = task.volumeRemaining;
-          } else {
-            volumeToLoad = slot.capacity;
-          }
+      for (const slot of slots) {
+        if (slot.assigned) continue;
 
-          const stationDist = DistanceMatrix[0][task.stationIndex + 1];
-          const waste = Math.max(0, volumeToLoad - task.volumeRemaining);
-          const sizePenalty = waste / slot.capacity;
-          const score = sizePenalty * 100 + stationDist / slot.speed;
+        const minFill = slot.capacity * 0.8;
+        let volumeToLoad: number;
 
-          if (score < bestScore) {
-            bestScore = score;
-            bestSlot = slot;
-            bestVolume = volumeToLoad;
-          }
-        }
-
-        if (bestSlot) {
-          bestSlot.assigned = true;
-          task.volumeRemaining -= bestVolume;
-
-          assignments.push({
-            slot: bestSlot,
-            fuelType: task.fuelType,
-            stationIndex: task.stationIndex,
-            volume: bestVolume
-          });
+        if (task.volumeRemaining >= slot.capacity) {
+          volumeToLoad = slot.capacity;
+        } else if (task.volumeRemaining >= minFill) {
+          volumeToLoad = task.volumeRemaining;
         } else {
-          break;
+          volumeToLoad = slot.capacity;
         }
+
+        const stationDist = DistanceMatrix[0][task.stationIndex + 1];
+        const waste = Math.max(0, volumeToLoad - task.volumeRemaining);
+        const sizePenalty = waste / slot.capacity;
+        const score = sizePenalty * 100 + stationDist / slot.speed;
+
+        if (score < bestScore) {
+          bestScore = score;
+          bestSlot = slot;
+          bestVolume = volumeToLoad;
+        }
+      }
+
+      if (bestSlot) {
+        bestSlot.assigned = true;
+        task.volumeRemaining -= bestVolume;
+
+        assignments.push({
+          slot: bestSlot,
+          fuelType: task.fuelType,
+          stationIndex: task.stationIndex,
+          volume: bestVolume
+        });
+      } else {
+        break;
       }
     }
   }
