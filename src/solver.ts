@@ -104,6 +104,17 @@ function solveWithBalancedGreedy(data: InputData): Solution {
   // Сортируем: наименее гибкие задачи первыми
   taskFlexibility.sort((a, b) => a.flexibility - b.flexibility);
 
+  // Логируем порядок обработки
+  console.log('📊 Стратегия Most Constrained First - порядок обработки задач:');
+  console.log('─'.repeat(80));
+  taskFlexibility.forEach(({ task, flexibility }, index) => {
+    console.log(
+      `${(index + 1).toString().padStart(2)}. ${task.fuelType.padEnd(6)} → Ст.${(task.stationIndex + 1).toString().padStart(2)} | ` +
+      `${task.volumeNeeded.toString().padStart(6)} л | Гибкость: ${flexibility.toString().padStart(2)} секций`
+    );
+  });
+  console.log('─'.repeat(80));
+
   const assignments: SlotAssignment[] = [];
 
   // Обрабатываем задачи в порядке гибкости
@@ -139,21 +150,54 @@ function solveWithBalancedGreedy(data: InputData): Solution {
         }
       }
 
-      if (bestSlot) {
-        bestSlot.assigned = true;
-        task.volumeRemaining -= bestVolume;
+        if (bestSlot) {
+          bestSlot.assigned = true;
+          task.volumeRemaining -= bestVolume;
 
-        assignments.push({
-          slot: bestSlot,
-          fuelType: task.fuelType,
-          stationIndex: task.stationIndex,
-          volume: bestVolume
-        });
-      } else {
-        break;
-      }
-    }
+          const fillPercent = ((bestVolume / bestSlot.capacity) * 100).toFixed(1);
+          console.log(
+            `  ✓ ${task.fuelType} → Ст.${task.stationIndex + 1}: ` +
+            `Секция ${bestSlot.compartmentIndex + 1} (${bestSlot.capacity}л) ` +
+            `загружена на ${bestVolume}л (${fillPercent}%)`
+          );
+
+          assignments.push({
+            slot: bestSlot,
+            fuelType: task.fuelType,
+            stationIndex: task.stationIndex,
+            volume: bestVolume
+          });
+        } else {
+          console.log(`  ✗ ${task.fuelType} → Ст.${task.stationIndex + 1}: НЕ НАЙДЕНА подходящая секция!`);
+          break;
+        }    }
   }
+
+  // Итоговая статистика
+  console.log('─'.repeat(80));
+  console.log('📈 Итоговая статистика:');
+  
+  const fuelStats: Record<string, { assigned: number; total: number }> = {};
+  for (const ft of FuelTypes) {
+    fuelStats[ft] = { assigned: 0, total: 0 };
+  }
+  
+  for (const assignment of assignments) {
+    fuelStats[assignment.fuelType].assigned += assignment.volume;
+  }
+  
+  for (const ft of FuelTypes) {
+    const totalDemand = Object.values(StationDemand[ft] as number[]).reduce((sum, val) => sum + val, 0);
+    fuelStats[ft].total = totalDemand;
+    const percent = totalDemand > 0 ? ((fuelStats[ft].assigned / totalDemand) * 100).toFixed(1) : '0.0';
+    const status = fuelStats[ft].assigned >= totalDemand ? '✓' : '✗';
+    console.log(
+      `  ${status} ${ft.padEnd(6)}: ${fuelStats[ft].assigned.toString().padStart(7)} / ${totalDemand.toString().padStart(7)} л (${percent}%)`
+    );
+  }
+  
+  console.log('─'.repeat(80));
+  console.log('');
 
   return buildSolution(data, assignments);
 }
